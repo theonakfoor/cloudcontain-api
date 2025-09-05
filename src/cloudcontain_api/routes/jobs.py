@@ -1,3 +1,3 @@
 from flask import Blueprint
 
-jobs = Blueprint("jobs", __name__)
+jobs_bp = Blueprint("jobs", __name__)

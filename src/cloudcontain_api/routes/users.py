@@ -4,16 +4,18 @@ from pymongo import MongoClient
 
 from src.cloudcontain_api.utils.auth import require_auth
 from src.cloudcontain_api.utils.constants import (
-    MONGO_CONN_STRING, MONGO_DB_NAME, AUTH0_DOMAIN
+    AUTH0_DOMAIN,
+    MONGO_CONN_STRING,
+    MONGO_DB_NAME,
 )
 
-users = Blueprint("users", __name__)
+users_bp = Blueprint("users", __name__)
 
 db_client = MongoClient(MONGO_CONN_STRING)
 db = db_client[MONGO_DB_NAME]
 
 
-@users.route("/user", methods=["GET"])
+@users_bp.route("/user", methods=["GET"])
 @require_auth
 def get_user():
     users = db["users"]
