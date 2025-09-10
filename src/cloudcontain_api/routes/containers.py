@@ -219,7 +219,7 @@ def execute_container(container_id):
         node = nodes.find_one({"$or": [{"alive": True}, {"pending": True}]})
 
         if node:
-            if node["alive"] == False:
+            if not node["alive"]:
                 job_status = "STARTING_NODE"
         else:
             insert_node_response = nodes.insert_one(

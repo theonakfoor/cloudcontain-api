@@ -2,8 +2,6 @@
 Utility functions for authentication and authorization using Auth0.
 """
 
-import json
-
 import requests
 from flask import jsonify, request
 from jose import jwt

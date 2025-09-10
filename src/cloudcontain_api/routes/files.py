@@ -1,4 +1,3 @@
-import io
 import re
 from datetime import datetime, timezone
 
@@ -84,7 +83,7 @@ def create_file(container_id, folder_id):
             )
 
             is_entry = False
-            if container["entryPoint"] == None:
+            if container["entryPoint"] is None:
                 containers.update_one(
                     {"_id": ObjectId(container_id)},
                     {"$set": {"entryPoint": insert_response.inserted_id}},
@@ -291,7 +290,7 @@ def update_file_content(container_id, file_id):
                 s3_object = app.s3.Object(S3_BUCKET_NAME, file["key"])
                 s3_object.upload_fileobj(request.stream)
             except Exception as e:
-                return jsonify({"message": "Error updating file content in S3."}), 500
+                return jsonify({"message": f"Error updating file content in S3. {e}"}), 500
             
             files.update_one(
                 {"_id": ObjectId(file_id)}, {"$set": 
@@ -356,7 +355,7 @@ def delete_file(container_id, file_id):
                 if response["ResponseMetadata"]["HTTPStatusCode"] != 204:
                     return jsonify({"message": "Error deleting file from S3."}), 500
             except Exception as e:
-                return jsonify({"message": "Error deleting file from S3."}), 500
+                return jsonify({"message": f"Error deleting file from S3. {e}"}), 500
             
             files.delete_one({"_id": ObjectId(file_id)})
 
