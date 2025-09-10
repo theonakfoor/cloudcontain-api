@@ -1,16 +1,12 @@
-import json
 import re
 from datetime import datetime, timezone
 
-import boto3
 from bson import ObjectId
 from flask import Blueprint, jsonify, request
-from pymongo import MongoClient
+from flask import current_app as app
 
 from src.cloudcontain_api.utils.auth import require_auth
 from src.cloudcontain_api.utils.constants import (
-    MONGO_CONN_STRING,
-    MONGO_DB_NAME,
     S3_BUCKET_NAME,
 )
 from src.cloudcontain_api.utils.utils import (
@@ -24,20 +20,16 @@ from src.cloudcontain_api.utils.utils import (
 
 folders_bp = Blueprint("folders", __name__)
 
-db_client = MongoClient(MONGO_CONN_STRING)
-db = db_client[MONGO_DB_NAME]
-
-s3 = boto3.resource("s3")
-
 
 @folders_bp.route("/containers/<container_id>/folders/<folder_id>", methods=["POST"])
 @require_auth
 def create_folder(container_id, folder_id):
     data = request.get_json()
-    containers = db["containers"]
-    folders = db["folders"]
+    containers = app.db["containers"]
+    folders = app.db["folders"]
 
     timestamp = datetime.now(timezone.utc)
+
     container = containers.find_one(
         {"_id": ObjectId(container_id), "owner": request.user["sub"]}
     )
@@ -93,23 +85,23 @@ def create_folder(container_id, folder_id):
                 },
             )
             return jsonify({"folderId": created_folder_id}), 201
+        
         else:
             return jsonify({"message": "Error creating folder."}), 500
+    elif containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
+        return jsonify({
+            "message": "User is not authorized to modify this container."
+        }), 401
     else:
-        if containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
-            return jsonify({
-                "message": "User is not authorized to modify this container."
-            }), 401
-        else:
-            return jsonify({"message": "Container not found."}), 404
+        return jsonify({"message": "Container not found."}), 404
         
 
 @folders_bp.route("/containers/<container_id>/folders/<folder_id>", methods=["GET"])
 @require_auth
 def get_folder(container_id, folder_id):
-    containers = db["containers"]
-    folders = db["folders"]
-    files = db["files"]
+    containers = app.db["containers"]
+    folders = app.db["folders"]
+    files = app.db["files"]
 
     container = containers.find_one(
         {"_id": ObjectId(container_id), "owner": request.user["sub"]}
@@ -146,7 +138,7 @@ def get_folder(container_id, folder_id):
             prefix = get_key_string(container_id, directory_path)
             directory_size = sum(
                 obj.size for
-                obj in s3.Bucket(S3_BUCKET_NAME).objects.filter(Prefix=prefix)
+                obj in app.s3.Bucket(S3_BUCKET_NAME).objects.filter(Prefix=prefix)
             )
             dir["size"] = directory_size
 
@@ -198,26 +190,22 @@ def get_folder(container_id, folder_id):
                 "lastModified": str(metadata["lastModified"]) if metadata else None,
             }
         ), 200
+    
+    elif containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
+        return jsonify({
+            "message": "User is not authorized to access this container's folders."
+        }), 401
     else:
-        if containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
-            return jsonify({
-                "message": "User is not authorized to access this container's folders."
-            }), 401
-        else:
-            return jsonify({"message": "Container not found."}), 404
+        return jsonify({"message": "Container not found."}), 404
         
 
 @folders_bp.route("/containers/<container_id>/folders/<folder_id>", methods=["PUT"])
 @require_auth
 def update_folder(container_id, folder_id):
-
-    def get_latest_value(original_obj, updated_obj, key):
-        return updated_obj[key] if key in updated_obj else original_obj[key] 
-
     data = request.get_json()
-    containers = db["containers"]
-    folders = db["folders"]
-    files = db["files"]
+    containers = app.db["containers"]
+    folders = app.db["folders"]
+    files = app.db["files"]
 
     timestamp = datetime.now(timezone.utc)
 
@@ -234,64 +222,31 @@ def update_folder(container_id, folder_id):
         )
         
         if folder:
+            new_name = data.get("name", folder["name"]).strip()
+            new_parent = get_folder_id(data.get("parent", folder["parent"]))
 
-            all_files, all_folders = get_container_contents(container_id, files, folders)
-            _, file_keys = get_all_keys(folder_id, all_folders, all_files)
+            name_duplicate_count = folders.count_documents(
+                {
+                    "containerId": ObjectId(container_id),
+                    "parent": new_parent,
+                    "name": re.compile(f"^{new_name}$", re.IGNORECASE),
+                    "_id": {"$ne": ObjectId(folder_id)},
+                },
+                limit=1,
+            )
+
+            if name_duplicate_count != 0:
+                return jsonify({"message": "Folder with this name already exists."}), 409
 
             updates = dict()
 
-            if "parent" in data and data["parent"]:
-                if get_path(data["parent"], container, include_all=False) == -1:
-                    return jsonify({"message": "Parent folder not found within this container."}), 404
-                
-                name_duplicate_count = folders.count_documents(
-                    {
-                        "containerId": ObjectId(container_id),
-                        "parent": get_folder_id(data["parent"]),
-                        "name": re.compile(f"^{get_latest_value(folder, data, "name")}$", re.IGNORECASE),
-                    },
-                    limit=1,
-                )
-
-                if name_duplicate_count != 0:
-                    return jsonify({"message": "Folder with this name already exists within parent folder."}), 409
-                
-                # Update local container folder reference
-                container["folders"][folder_id]["parent"] = data["parent"]
-                # Update remote container folder reference
-                containers.update_one(
-                    {"_id": ObjectId(container_id)},
-                    {
-                        "$set": {
-                            f"folders.{folder_id}.parent": data["parent"],
-                            "lastModified": timestamp,
-                        }
-                    },
-                )
-
-                updates["parent"] = get_folder_id(data["parent"])
-                
             if "name" in data and data["name"]:
                 data["name"] = data["name"].strip()
 
                 if not re.match(r"[\w\-.]+$", data["name"]):
                     return jsonify({"message": "Please provide a valid folder name."}), 400
                 
-                name_duplicate_count = folders.count_documents(
-                    {
-                        "containerId": ObjectId(container_id),
-                        "parent": get_latest_value(folder, updates, "parent"),
-                        "name": re.compile(f"^{data["name"]}$", re.IGNORECASE),
-                    },
-                    limit=1,
-                )
-
-                if name_duplicate_count != 0:
-                    return jsonify({"message": "Folder with this name already exists."}), 409
-                
-                # Update local container folder reference
                 container["folders"][folder_id]["name"] = data["name"]
-                # Update remote container folder reference
                 containers.update_one(
                     {"_id": ObjectId(container_id)},
                     {
@@ -304,23 +259,24 @@ def update_folder(container_id, folder_id):
 
                 updates["name"] = data["name"]
 
+            if "parent" in data and data["parent"]:
+                if get_path(data["parent"], container, include_all=False) == -1:
+                    return jsonify({"message": "Parent folder not found within this container."}), 404
+                
+                container["folders"][folder_id]["parent"] = data["parent"]
+                containers.update_one(
+                    {"_id": ObjectId(container_id)},
+                    {
+                        "$set": {
+                            f"folders.{folder_id}.parent": data["parent"],
+                            "lastModified": timestamp,
+                        }
+                    },
+                )
+
+                updates["parent"] = get_folder_id(data["parent"])
+
             if updates:
-
-                for file in file_keys:
-                    file_path = get_path(file["folder"], container, include_all=False)
-                    new_key = get_key_string(container_id, file_path, file["name"])
-
-                    rename_s3_object(file["key"], new_key)
-
-                    files.update_one(
-                        {"_id": ObjectId(file["fileId"])},
-                        {
-                            "$set": {
-                                "key": new_key,
-                            }
-                        },
-                    )
-
                 folders.update_one(
                     {"_id": ObjectId(folder_id)},
                     {
@@ -330,6 +286,22 @@ def update_folder(container_id, folder_id):
                         }
                     },
                 )
+                                
+                all_files, all_folders = get_container_contents(container_id, files, folders)
+                _, file_keys = get_all_keys(folder_id, all_folders, all_files)
+
+                for file in file_keys:
+                    file_path = get_path(file["folder"], container, include_all=False)
+                    new_key = get_key_string(container_id, file_path, file["name"])
+                    rename_s3_object(file["key"], new_key)
+                    files.update_one(
+                        {"_id": ObjectId(file["fileId"])},
+                        {
+                            "$set": {
+                                "key": new_key,
+                            }
+                        },
+                    )
 
                 return jsonify({
                     "folderId": folder_id,
@@ -339,25 +311,22 @@ def update_folder(container_id, folder_id):
 
             else:
                 return jsonify({"message": "No valid updates provided."}), 400
-            
         else:
             return jsonify({"message": "Folder not found within this container."}), 404
-
+    elif containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
+        return jsonify({
+            "message": "User is not authorized to modify this container's folders."
+        }), 401
     else:
-        if containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
-            return jsonify({
-                "message": "User is not authorized to modify this container's folders."
-            }), 401
-        else:
-            return jsonify({"message": "Container not found."}), 404
+        return jsonify({"message": "Container not found."}), 404
         
     
 @folders_bp.route("/containers/<container_id>/folders/<folder_id>", methods=["DELETE"])
 @require_auth
 def delete_folder(container_id, folder_id):
-    containers = db["containers"]
-    files = db["files"]
-    folders = db["folders"]
+    containers = app.db["containers"]
+    files = app.db["files"]
+    folders = app.db["folders"]
 
     timestamp = datetime.now(timezone.utc)
 
@@ -389,7 +358,7 @@ def delete_folder(container_id, folder_id):
             for file in file_keys
         ]
         if delete_keys:
-            s3.Bucket(S3_BUCKET_NAME).delete_objects(Delete={"Objects": delete_keys})
+            app.s3.Bucket(S3_BUCKET_NAME).delete_objects(Delete={"Objects": delete_keys})
 
         folders.delete_many({
             "_id": {
@@ -403,29 +372,23 @@ def delete_folder(container_id, folder_id):
             }
         }) 
 
-        container_updates = { 
-            "lastModified": timestamp 
-        }
-        if contains_entrypoint:
-            container_updates["entryPoint"] = None  
-
         containers.update_one(
             {"_id": ObjectId(container_id)}, 
             {
-                "$set": container_updates,
+                "$set": { 
+                    "lastModified": timestamp 
+                },
                 "$unset": {
                     f"folders.{folder['folderId']}": "" for folder in folder_keys
                 },
             },
         )
 
+        return '', 204
+    
+    elif containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
         return jsonify({
-            "message": "Folder deleted."
-        }), 200
+            "message": "User is not authorized to delete this container's folders."
+        }), 401
     else:
-        if containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
-            return jsonify({
-                "message": "User is not authorized to delete this container's folders."
-            }), 401
-        else:
-            return jsonify({"message": "Container not found."}), 404
+        return jsonify({"message": "Container not found."}), 404

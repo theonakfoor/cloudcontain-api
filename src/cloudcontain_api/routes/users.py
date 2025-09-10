@@ -1,25 +1,20 @@
 import requests
 from flask import Blueprint, jsonify, request
-from pymongo import MongoClient
+from flask import current_app as app
 
 from src.cloudcontain_api.utils.auth import require_auth
 from src.cloudcontain_api.utils.constants import (
     AUTH0_DOMAIN,
-    MONGO_CONN_STRING,
-    MONGO_DB_NAME,
 )
 
 users_bp = Blueprint("users", __name__)
-
-db_client = MongoClient(MONGO_CONN_STRING)
-db = db_client[MONGO_DB_NAME]
 
 
 @users_bp.route("/user", methods=["GET"])
 @require_auth
 def get_user():
-    users = db["users"]
-    containers = db["containers"]
+    users = app.db["users"]
+    containers = app.db["containers"]
 
     user = users.find_one({"authId": request.user["sub"]})
 
@@ -35,6 +30,7 @@ def get_user():
                 "containers": int(containerCount),
             }
         ), 200
+    
     else:
         user_info_response = requests.get(
             f"https://{AUTH0_DOMAIN}/userinfo",
@@ -63,5 +59,6 @@ def get_user():
                     "containers": 0,
                 }
             ), 201
+        
         else:
             return jsonify({"message": "Error inserting user information."}), 500

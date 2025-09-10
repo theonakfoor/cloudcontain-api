@@ -1,49 +1,30 @@
 import json
 from datetime import datetime, timezone
 
-import boto3
 from bson import ObjectId
 from flask import Blueprint, jsonify, request
-from pusher import Pusher
-from pymongo import MongoClient
+from flask import current_app as app
 
 from src.cloudcontain_api.utils.auth import require_auth
 from src.cloudcontain_api.utils.constants import (
     JOB_NODE_AMI_ID,
-    MONGO_CONN_STRING,
-    MONGO_DB_NAME,
-    PUSHER_APP_ID,
-    PUSHER_CLUSTER,
-    PUSHER_KEY,
-    PUSHER_SECRET,
     S3_BUCKET_NAME,
     SQS_URL,
 )
 
 containers_bp = Blueprint("containers", __name__)
 
-db_client = MongoClient(MONGO_CONN_STRING)
-db = db_client[MONGO_DB_NAME]
-
-s3 = boto3.resource("s3")
-sqs = boto3.client("sqs", region_name="us-west-1")
-ec2 = boto3.client("ec2", region_name="us-west-1")
-
-pusher = Pusher(
-    app_id=PUSHER_APP_ID,
-    key=PUSHER_KEY,
-    secret=PUSHER_SECRET,
-    cluster=PUSHER_CLUSTER,
-)
-
 
 @containers_bp.route("/containers", methods=["POST"])
 @require_auth
 def create_container():
     data = request.get_json()
-    col = db["containers"]
+    col = app.db["containers"]
 
     timestamp = datetime.now(timezone.utc)
+
+    if "name" not in data or not data["name"].strip():
+        return jsonify({"message": "Please provide a valid container name."}), 400
 
     insert = col.insert_one(
         {
@@ -67,8 +48,8 @@ def create_container():
 @containers_bp.route("/containers", methods=["GET"])
 @require_auth
 def list_containers():
-    offset = int(request.args.get("offset")) if request.args.get("offset") else 0
-    col = db["containers"]
+    offset = int(request.args.get("offset", 0))
+    col = app.db["containers"]
 
     containers = col.find(
         {"owner": request.user["sub"]}, limit=offset + 10, skip=offset
@@ -92,7 +73,7 @@ def list_containers():
 @containers_bp.route("/containers/<container_id>", methods=["GET"])
 @require_auth
 def get_container(container_id):
-    col = db["containers"]
+    col = app.db["containers"]
 
     container = col.find_one(
         {"_id": ObjectId(container_id), "owner": request.user["sub"]}
@@ -118,22 +99,23 @@ def get_container(container_id):
                 "entryPoint": str(container["entryPoint"]),
             }
         ), 200
+    
+    elif col.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
+        return jsonify({
+            "message": "User is not authorized to access this container."
+        }), 401
     else:
-        if col.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
-            return jsonify({
-                "message": "User is not authorized to access this container."
-            }), 401
-        else:
-            return jsonify({"message": "Container not found."}), 404
+        return jsonify({"message": "Container not found."}), 404
         
 
 @containers_bp.route("/containers/<container_id>", methods=["PUT"])
 @require_auth
 def update_container(container_id):
     data = request.get_json()
-    col = db["containers"]
+    col = app.db["containers"]
 
     timestamp = datetime.now(timezone.utc)
+
     container = col.find_one(
         {"_id": ObjectId(container_id), "owner": request.user["sub"]}
     )
@@ -158,26 +140,26 @@ def update_container(container_id):
                 },
             )
             return jsonify({"message": "Container updated."}), 204
+        
         else:
             return jsonify({"message": "No valid updates provided."}), 400
-
+        
+    elif col.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
+        return jsonify({
+            "message": "User is not authorized to modify this container."
+        }), 401
     else:
-        if col.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
-            return jsonify({
-                "message": "User is not authorized to modify this container."
-            }), 401
-        else:
-            return jsonify({"message": "Container not found."}), 404
+        return jsonify({"message": "Container not found."}), 404
         
 
 @containers_bp.route("/containers/<container_id>", methods=["DELETE"])
 @require_auth
 def delete_container(container_id):
-    containers = db["containers"]
-    folders = db["folders"]
-    files = db["files"]
-    jobs = db["jobs"]
-    logs = db["logs"]
+    containers = app.db["containers"]
+    folders = app.db["folders"]
+    files = app.db["files"]
+    jobs = app.db["jobs"]
+    logs = app.db["logs"]
 
     container = containers.find_one(
         {"_id": ObjectId(container_id), "owner": request.user["sub"]}
@@ -185,7 +167,7 @@ def delete_container(container_id):
 
     if container:
         # Delete S3 objects
-        bucket = s3.Bucket(S3_BUCKET_NAME)
+        bucket = app.s3.Bucket(S3_BUCKET_NAME)
         to_delete = bucket.objects.filter(Prefix=f"{container_id}/")
         delete_keys = [{"Key": obj.key} for obj in to_delete]
         if delete_keys:
@@ -201,22 +183,23 @@ def delete_container(container_id):
         logs.delete_many({"containerId": ObjectId(container_id)})
         # Delete container metadata
         containers.delete_one({"_id": ObjectId(container_id)})
-        return jsonify({"message": "Container deleted."}), 200
+        
+        return '', 204
+    
+    elif containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
+        return jsonify({
+            "message": "User is not authorized to delete this container."
+        }), 401
     else:
-        if containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
-            return jsonify({
-                "message": "User is not authorized to delete this container."
-            }), 401
-        else:
-            return jsonify({"message": "Container not found."}), 404
+        return jsonify({"message": "Container not found."}), 404
         
 
 @containers_bp.route("/containers/<container_id>/execute", methods=["POST"])
 @require_auth
 def execute_container(container_id):
-    containers = db["containers"]
-    jobs = db["jobs"]
-    nodes = db["nodes"]
+    containers = app.db["containers"]
+    jobs = app.db["jobs"]
+    nodes = app.db["nodes"]
 
     container = containers.find_one(
         {"_id": ObjectId(container_id), "owner": request.user["sub"]}
@@ -253,7 +236,7 @@ def execute_container(container_id):
 
             if insert_node_response.inserted_id:
                 node_tag = str(insert_node_response.inserted_id)[-5:]
-                ec2.run_instances(
+                app.ec2.run_instances(
                     ImageId=JOB_NODE_AMI_ID,
                     InstanceType="t3.small",
                     KeyName="cloudcontain",
@@ -295,7 +278,7 @@ def execute_container(container_id):
         if insert_job_response.inserted_id:
             # Notify Pusher than job has been queued for containerId
             job_id = str(insert_job_response.inserted_id)
-            pusher.trigger(
+            app.pusher.trigger(
                 container_id,
                 "job-queued",
                 {
@@ -310,7 +293,7 @@ def execute_container(container_id):
             )
 
             # Insert job into SQS queue
-            sqs.send_message(
+            app.sqs.send_message(
                 QueueUrl=SQS_URL,
                 MessageBody=json.dumps(
                     {
@@ -335,15 +318,15 @@ def execute_container(container_id):
                     "output": [],
                 }
             ), 201
+        
         else:
             return jsonify(
                 {"message": "Error queuing job. Please try again later."}
             ), 500
-
+        
+    elif containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
+        return jsonify({
+            "message": "User is not authorized to execute this container."
+        }), 401
     else:
-        if containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
-            return jsonify({
-                "message": "User is not authorized to execute this container."
-            }), 401
-        else:
-            return jsonify({"message": "Container not found."}), 404
+        return jsonify({"message": "Container not found."}), 404
