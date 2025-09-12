@@ -4,10 +4,9 @@ Utility functions for container and file management and interaction with AWS ser
 
 import boto3
 from bson import ObjectId
+from flask import current_app as app
 
 from cloudcontain_api.utils.constants import S3_BUCKET_NAME
-
-s3 = boto3.client("s3")
 
 
 def get_path(folder, container, include_all=True):
@@ -42,16 +41,15 @@ def get_folder_id(folderId):
 
 
 def rename_s3_object(old_key, new_key):
-    s3.copy_object(
-        Bucket=S3_BUCKET_NAME,
-        CopySource={"Bucket": S3_BUCKET_NAME, "Key": old_key},
-        Key=new_key,
-    )
-    s3.delete_object(Bucket=S3_BUCKET_NAME, Key=old_key)
-
+    bucket = app.s3.Bucket(S3_BUCKET_NAME)
+    source_object = bucket.Object(old_key)
+    bucket.copy({
+        "Bucket": S3_BUCKET_NAME, "Key": old_key
+    }, new_key)
+    source_object.delete()
 
 def stream_s3_object(key):
-    s3_object = s3.get_object(Bucket=S3_BUCKET_NAME, Key=key)
+    s3_object = app.s3.object(S3_BUCKET_NAME, key)
     with s3_object.get()["Body"] as body:
         for chunk in iter(lambda: body.read(4096), b""):
             yield chunk
