@@ -232,6 +232,11 @@ def update_file(container_id, file_id):
                 updates["folder"] = get_folder_id(data["folder"])
 
             if updates:
+                new_path = get_path(new_folder, container, include_all=False)
+                new_key = get_key_string(container_id, new_path, new_name)
+                updates["key"] = new_key    
+                rename_s3_object(file["key"], new_key)
+
                 files.update_one(
                     {"_id": ObjectId(file_id)},
                     {
@@ -241,10 +246,6 @@ def update_file(container_id, file_id):
                         }
                     },
                 )
-
-                new_path = get_path(new_folder, container, include_all=False)
-                new_key = get_key_string(container_id, new_path, new_name)
-                rename_s3_object(file["key"], new_key)
 
                 return jsonify({
                     "fileId": str(file["_id"]),
