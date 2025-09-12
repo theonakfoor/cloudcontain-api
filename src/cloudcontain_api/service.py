@@ -4,12 +4,12 @@ from flask_cors import CORS
 from pusher import Pusher
 from pymongo import MongoClient
 
-from src.cloudcontain_api.routes.containers import containers_bp
-from src.cloudcontain_api.routes.files import files_bp
-from src.cloudcontain_api.routes.folders import folders_bp
-from src.cloudcontain_api.routes.jobs import jobs_bp
-from src.cloudcontain_api.routes.users import users_bp
-from src.cloudcontain_api.utils.constants import (
+from cloudcontain_api.routes.containers import containers_bp
+from cloudcontain_api.routes.files import files_bp
+from cloudcontain_api.routes.folders import folders_bp
+from cloudcontain_api.routes.jobs import jobs_bp
+from cloudcontain_api.routes.users import users_bp
+from cloudcontain_api.utils.constants import (
     MONGO_CONN_STRING,
     MONGO_DB_NAME,
     PUSHER_APP_ID,

@@ -2,8 +2,8 @@ import requests
 from flask import Blueprint, jsonify, request
 from flask import current_app as app
 
-from src.cloudcontain_api.utils.auth import require_auth
-from src.cloudcontain_api.utils.constants import (
+from cloudcontain_api.utils.auth import require_auth
+from cloudcontain_api.utils.constants import (
     AUTH0_DOMAIN,
 )
 

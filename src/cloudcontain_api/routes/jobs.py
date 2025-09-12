@@ -2,7 +2,7 @@ from bson import ObjectId
 from flask import Blueprint, jsonify, request
 from flask import current_app as app
 
-from src.cloudcontain_api.utils.auth import require_auth
+from cloudcontain_api.utils.auth import require_auth
 
 jobs_bp = Blueprint("jobs", __name__)
 

@@ -6,7 +6,7 @@ import requests
 from flask import jsonify, request
 from jose import jwt
 
-from src.cloudcontain_api.utils.constants import (
+from cloudcontain_api.utils.constants import (
     AUTH0_ALGORITHMS,
     AUTH0_API_IDENTIFIER,
     AUTH0_DOMAIN,

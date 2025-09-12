@@ -5,11 +5,11 @@ from bson import ObjectId
 from flask import Blueprint, Response, jsonify, request
 from flask import current_app as app
 
-from src.cloudcontain_api.utils.auth import require_auth
-from src.cloudcontain_api.utils.constants import (
+from cloudcontain_api.utils.auth import require_auth
+from cloudcontain_api.utils.constants import (
     S3_BUCKET_NAME,
 )
-from src.cloudcontain_api.utils.utils import (
+from cloudcontain_api.utils.utils import (
     get_folder_id,
     get_key_string,
     get_path,

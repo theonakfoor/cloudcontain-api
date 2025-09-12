@@ -5,8 +5,8 @@ from bson import ObjectId
 from flask import Blueprint, jsonify, request
 from flask import current_app as app
 
-from src.cloudcontain_api.utils.auth import require_auth
-from src.cloudcontain_api.utils.constants import (
+from cloudcontain_api.utils.auth import require_auth
+from cloudcontain_api.utils.constants import (
     JOB_NODE_AMI_ID,
     S3_BUCKET_NAME,
     SQS_URL,
@@ -180,7 +180,7 @@ def delete_container(container_id):
         folders.delete_many({"containerId": ObjectId(container_id)})
         jobs.delete_many({"containerId": ObjectId(container_id)})
         logs.delete_many({"containerId": ObjectId(container_id)})
-        
+
         containers.delete_one({"_id": ObjectId(container_id)})
         
         return '', 204
