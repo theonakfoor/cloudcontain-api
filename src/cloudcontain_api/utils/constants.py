@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 AUTH0_DOMAIN = os.getenv("AUTH0_DOMAIN")
 AUTH0_API_IDENTIFIER = os.getenv("AUTH0_API_IDENTIFIER")
