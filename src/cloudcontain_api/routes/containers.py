@@ -166,22 +166,21 @@ def delete_container(container_id):
     )
 
     if container:
-        # Delete S3 objects
-        bucket = app.s3.Bucket(S3_BUCKET_NAME)
-        to_delete = bucket.objects.filter(Prefix=f"{container_id}/")
-        delete_keys = [{"Key": obj.key} for obj in to_delete]
-        if delete_keys:
-            bucket.delete_objects(Delete={"Objects": delete_keys})
+        
+        try:
+            bucket = app.s3.Bucket(S3_BUCKET_NAME)
+            to_delete = bucket.objects.filter(Prefix=f"{container_id}/")
+            delete_keys = [{"Key": obj.key} for obj in to_delete]
+            if delete_keys:
+                bucket.delete_objects(Delete={"Objects": delete_keys})
+        except Exception as e:
+            return jsonify({"message": f"Error deleting container files from S3. {e}"}), 500
 
-        # Delete file metadata
         files.delete_many({"containerId": ObjectId(container_id)})
-        # Delete folder metadata
         folders.delete_many({"containerId": ObjectId(container_id)})
-        # Delete container job history
         jobs.delete_many({"containerId": ObjectId(container_id)})
-        # Delete container log history
         logs.delete_many({"containerId": ObjectId(container_id)})
-        # Delete container metadata
+        
         containers.delete_one({"_id": ObjectId(container_id)})
         
         return '', 204
