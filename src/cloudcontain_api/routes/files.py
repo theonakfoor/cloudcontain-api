@@ -2,7 +2,7 @@ import re
 from datetime import datetime, timezone
 
 from bson import ObjectId
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, jsonify, request, stream_with_context
 from flask import current_app as app
 
 from cloudcontain_api.utils.auth import require_auth
@@ -162,7 +162,8 @@ def get_file_content(container_id, file_id):
 
         if file:
             return Response(
-                stream_s3_object(file["key"]), content_type="application/octet-stream"
+                stream_with_context(stream_s3_object(file["key"])), 
+                content_type="application/octet-stream"
             ), 200
         
         else:

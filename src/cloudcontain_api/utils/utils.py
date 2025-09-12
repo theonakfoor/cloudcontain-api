@@ -1,8 +1,6 @@
 """
 Utility functions for container and file management and interaction with AWS services.
 """
-
-import boto3
 from bson import ObjectId
 from flask import current_app as app
 
@@ -47,6 +45,7 @@ def rename_s3_object(old_key, new_key):
         "Bucket": S3_BUCKET_NAME, "Key": old_key
     }, new_key)
     source_object.delete()
+
 
 def stream_s3_object(key):
     s3_object = app.s3.Object(S3_BUCKET_NAME, key)
