@@ -49,7 +49,7 @@ def rename_s3_object(old_key, new_key):
     source_object.delete()
 
 def stream_s3_object(key):
-    s3_object = app.s3.object(S3_BUCKET_NAME, key)
+    s3_object = app.s3.Object(S3_BUCKET_NAME, key)
     with s3_object.get()["Body"] as body:
         for chunk in iter(lambda: body.read(4096), b""):
             yield chunk
