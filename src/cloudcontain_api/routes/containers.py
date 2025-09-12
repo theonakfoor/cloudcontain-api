@@ -236,7 +236,7 @@ def execute_container(container_id):
             if insert_node_response.inserted_id:
                 node_tag = str(insert_node_response.inserted_id)[-5:]
                 app.ec2.run_instances(
-                    ImageId=JOB_NODE_AMI_ID,
+                    ImageId="ami-07f13b8cbf45f5f9d",
                     InstanceType="t3.small",
                     KeyName="cloudcontain",
                     MinCount=1,
