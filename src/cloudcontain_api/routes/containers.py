@@ -220,6 +220,7 @@ def execute_container(container_id):
         if node:
             if not node["alive"]:
                 job_status = "STARTING_NODE"
+            node = node["_id"]
         else:
             insert_node_response = nodes.insert_one(
                 {
@@ -255,6 +256,7 @@ def execute_container(container_id):
                     ],
                 )
                 job_status = "STARTING_NODE"
+                node = insert_node_response.inserted_id
             else:
                 return jsonify(
                     {"message": "Error starting node. Please try again later."}
@@ -269,7 +271,7 @@ def execute_container(container_id):
                 "started": None,
                 "ended": None,
                 "requestedBy": request.user["sub"],
-                "node": None,
+                "node": node,
             }
         )
 
