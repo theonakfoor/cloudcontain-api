@@ -236,7 +236,7 @@ def execute_container(container_id):
             if insert_node_response.inserted_id:
                 node_tag = str(insert_node_response.inserted_id)[-5:]
                 app.ec2.run_instances(
-                    ImageId="ami-07f13b8cbf45f5f9d",
+                    ImageId=JOB_NODE_AMI_ID,
                     InstanceType="t3.small",
                     KeyName="cloudcontain",
                     MinCount=1,
@@ -254,7 +254,6 @@ def execute_container(container_id):
                         }
                     ],
                 )
-
                 job_status = "STARTING_NODE"
             else:
                 return jsonify(

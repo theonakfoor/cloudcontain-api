@@ -196,11 +196,10 @@ def update_file(container_id, file_id):
 
         if file:
             new_name = data.get("name", file["name"]).strip()
-            new_folder = get_folder_id(data.get("folder", file["folder"]))
 
             name_duplicate_count = files.count_documents(
                 {"containerId": ObjectId(container_id), 
-                 "folder": new_folder, 
+                 "folder": get_folder_id(data.get("folder", file["folder"])), 
                  "name": re.compile(f"^{new_name}$", re.IGNORECASE),
                  "_id": {"$ne": ObjectId(file_id)}},
                 limit=1,
@@ -232,8 +231,10 @@ def update_file(container_id, file_id):
                 updates["folder"] = get_folder_id(data["folder"])
 
             if updates:
+                new_folder = data.get("folder", file["folder"])
                 new_path = get_path(new_folder, container, include_all=False)
                 new_key = get_key_string(container_id, new_path, new_name)
+
                 updates["key"] = new_key    
                 rename_s3_object(file["key"], new_key)
 
