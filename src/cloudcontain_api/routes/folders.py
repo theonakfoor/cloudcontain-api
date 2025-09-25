@@ -367,7 +367,7 @@ def delete_folder(container_id, folder_id):
             }
         })
 
-        total_size_result = files.aggregate([
+        total_size_response = next(files.aggregate([
             {
                 "$match": {
                     "_id": {
@@ -381,7 +381,8 @@ def delete_folder(container_id, folder_id):
                     "totalSize": {"$sum": "$size"}
                 }
             }
-        ])
+        ]))
+        total_size = total_size_response["totalSize"]
 
         files.delete_many({
             "_id": {
@@ -394,7 +395,7 @@ def delete_folder(container_id, folder_id):
             {
                 "$set": { 
                     "lastModified": timestamp,
-                    "size": container["size"] - total_size_result.get("totalSize", 0)
+                    "size": container["size"] - total_size
                 },
                 "$unset": {
                     f"folders.{folder['folderId']}": "" for folder in folder_keys
