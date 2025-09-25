@@ -381,7 +381,7 @@ def delete_folder(container_id, folder_id):
                     "totalSize": {"$sum": "$size"}
                 }
             }
-        ]))
+        ]), {"totalSize": 0})
         total_size = total_size_response["totalSize"]
 
         files.delete_many({
@@ -403,7 +403,11 @@ def delete_folder(container_id, folder_id):
             },
         )
 
-        return '', 204
+        return jsonify(
+            {
+                "delta": container["size"] - total_size,
+            }
+        ), 200
     
     elif containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
         return jsonify({
