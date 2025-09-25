@@ -288,12 +288,12 @@ def update_file_content(container_id, file_id):
 
         if file:
             file_size = request.content_length
-            if file_size and file_size > 500 * 1024 * 1024:
-                return jsonify({"message": "File size exceeds the 500MB limit."}), 413
+            if file_size and file_size > 10 * 1024 * 1024:
+                return jsonify({"message": "File size exceeds the 10MB limit."}), 413
             
             delta = file_size - file["size"]
-            if container["size"] + delta > 3 * 1024 * 1024 * 1024:
-                return jsonify({"message": "Container size limit of 3GB exceeded."}), 413
+            if container["size"] + delta > 500 * 1024 * 1024:
+                return jsonify({"message": "Container size limit of 500MB exceeded."}), 413
 
             try:
                 s3_object = app.s3.Object(S3_BUCKET_NAME, file["key"])
