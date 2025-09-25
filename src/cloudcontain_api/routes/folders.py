@@ -367,6 +367,22 @@ def delete_folder(container_id, folder_id):
             }
         })
 
+        total_size_result = files.aggregate([
+            {
+                "$match": {
+                    "_id": {
+                        "$in": [ObjectId(file["fileId"]) for file in file_keys]
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": None,
+                    "totalSize": {"$sum": "$size"}
+                }
+            }
+        ])
+
         files.delete_many({
             "_id": {
                 "$in": [ObjectId(file["fileId"]) for file in file_keys]
@@ -377,7 +393,8 @@ def delete_folder(container_id, folder_id):
             {"_id": ObjectId(container_id)}, 
             {
                 "$set": { 
-                    "lastModified": timestamp 
+                    "lastModified": timestamp,
+                    "size": container["size"] - total_size_result.get("totalSize", 0)
                 },
                 "$unset": {
                     f"folders.{folder['folderId']}": "" for folder in folder_keys
