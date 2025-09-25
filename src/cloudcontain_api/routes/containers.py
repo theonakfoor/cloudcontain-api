@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
 from flask import Blueprint, jsonify, request
@@ -25,11 +25,18 @@ def create_container():
 
     if "name" not in data or not data["name"].strip():
         return jsonify({"message": "Please provide a valid container name."}), 400
+    
+    owned_containers = col.count_documents({"owner": request.user["sub"]})
+    if owned_containers >= 3:
+        return jsonify(
+            {"message": "You have reached the limit of 3 free containers."}
+        ), 403
 
     insert = col.insert_one(
         {
             "owner": request.user["sub"],
             "name": data["name"],
+            "description": None,
             "created": timestamp,
             "lastModified": timestamp,
             "public": False,
@@ -129,6 +136,15 @@ def update_container(container_id):
         if "name" in data:
             updates["name"] = data["name"].strip()
 
+        if "description" in data:
+            updates["description"] = data["description"].strip()
+        
+        if "public" in data:
+            try:
+                updates["public"] = bool(data["public"])
+            except ValueError:
+                return jsonify({"message": "Public must be specified as a boolean value."}), 400
+
         if updates:
             col.update_one(
                 {"_id": ObjectId(container_id)},
@@ -214,14 +230,22 @@ def execute_container(container_id):
                 {"message": "Container already has an active job running or queued."}
             ), 400
         
+        jobs_last_month = jobs.count_documents({
+            "requestedBy": request.user["sub"],
+            "queued": {"$gte": datetime.now(timezone.utc) - timedelta(days=30)}
+        })
+        if jobs_last_month >= 50:
+            return jsonify(
+                {"message": "You have reached the limit of 50 jobs in the last 30 days."}
+            ), 429
+        
         job_status = "PENDING"
-        node = nodes.find_one({"$or": [{"alive": True}, {"pending": True}]})
+        node_count = nodes.count_documents({"$or": [{"alive": True}, {"pending": True}]})
+        queued_jobs = jobs.count_documents({
+            "status": {"$in": ["STARTING_NODE", "PENDING"]}
+        })
 
-        if node:
-            if not node["alive"]:
-                job_status = "STARTING_NODE"
-            node = node["_id"]
-        else:
+        if (node_count == 0 or queued_jobs >= 20) and node_count < 3:
             insert_node_response = nodes.insert_one(
                 {
                     "pending": True,
@@ -256,11 +280,14 @@ def execute_container(container_id):
                     ],
                 )
                 job_status = "STARTING_NODE"
-                node = insert_node_response.inserted_id
             else:
                 return jsonify(
                     {"message": "Error starting node. Please try again later."}
                 ), 500
+        else:
+            node = nodes.find_one({"$or": [{"alive": False}, {"pending": True}]})
+            if node:
+                job_status = "STARTING_NODE"
             
         queued_time = datetime.now(timezone.utc)
         insert_job_response = jobs.insert_one(
@@ -271,7 +298,7 @@ def execute_container(container_id):
                 "started": None,
                 "ended": None,
                 "requestedBy": request.user["sub"],
-                "node": node,
+                "node": None,
             }
         )
 
@@ -287,7 +314,7 @@ def execute_container(container_id):
                     "queued": str(queued_time),
                     "started": None,
                     "ended": None,
-                    "node": str(node),
+                    "node": None,
                     "output": [],
                 },
             )
@@ -313,7 +340,7 @@ def execute_container(container_id):
                     "queued": str(queued_time),
                     "started": None,
                     "ended": None,
-                    "node": str(node),
+                    "node": None,
                     "logCount": 0,
                     "output": [],
                 }
