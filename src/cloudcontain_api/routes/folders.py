@@ -405,7 +405,7 @@ def delete_folder(container_id, folder_id):
 
         return jsonify(
             {
-                "delta": container["size"] - total_size,
+                "delta": total_size,
             }
         ), 200
     
