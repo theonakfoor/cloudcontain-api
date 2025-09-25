@@ -43,6 +43,7 @@ def create_container():
             "folders": {},
             "entryPoint": None,
             "sharedWith": [],
+            "size": 0,
         }
     )
 
@@ -70,7 +71,8 @@ def list_containers():
                 "created": str(container["created"]),
                 "lastModified": str(container["lastModified"]),
                 "public": container["public"],
-                "entryPoint": str(container["entryPoint"])
+                "entryPoint": str(container["entryPoint"]),
+                "size": int(container["size"]),
             }
             for container in containers
         ]
@@ -100,6 +102,7 @@ def get_container(container_id):
             {
                 "containerId": str(container["_id"]),
                 "name": container["name"],
+                "size": int(container["size"]),
                 "created": container["created"],
                 "lastModified": str(container["lastModified"]),
                 "public": container["public"],

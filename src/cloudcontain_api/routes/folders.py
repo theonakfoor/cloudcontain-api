@@ -181,6 +181,7 @@ def get_folder(container_id, folder_id):
         return jsonify(
             {
                 "folderId": folder_id,
+                "name": metadata["name"] if (metadata and folder_id != "~") else "ROOT",
                 "parent": str(metadata["parent"]) if metadata else None,
                 "path": folder_path,
                 "directories": sub_directories,

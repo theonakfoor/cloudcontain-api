@@ -288,6 +288,12 @@ def update_file_content(container_id, file_id):
 
         if file:
             file_size = request.content_length
+            if file_size and file_size > 500 * 1024 * 1024:
+                return jsonify({"message": "File size exceeds the 500MB limit."}), 413
+            
+            delta = file_size - file["size"]
+            if container["size"] + delta > 3 * 1024 * 1024 * 1024:
+                return jsonify({"message": "Container size limit of 3GB exceeded."}), 413
 
             try:
                 s3_object = app.s3.Object(S3_BUCKET_NAME, file["key"])
@@ -305,7 +311,12 @@ def update_file_content(container_id, file_id):
             )
 
             containers.update_one(
-                {"_id": ObjectId(container_id)}, {"$set": {"lastModified": timestamp}}
+                {"_id": ObjectId(container_id)}, {"$set": 
+                    {
+                        "lastModified": timestamp,
+                        "size": container["size"] + delta,
+                    }
+                }
             )
 
             return jsonify(
@@ -313,6 +324,7 @@ def update_file_content(container_id, file_id):
                     "fileId": str(file["_id"]),
                     "lastModified": str(timestamp),
                     "size": file_size,
+                    "delta": delta,
                 }
             ), 200
 
@@ -364,7 +376,10 @@ def delete_file(container_id, file_id):
 
             containers.update_one(
                 {"_id": ObjectId(container_id)}, {
-                    "$set": {"lastModified": timestamp}
+                    "$set": {
+                        "lastModified": timestamp,
+                        "size": container["size"] - file["size"],
+                    }
                 }
             )
 
