@@ -288,7 +288,7 @@ def execute_container(container_id):
                     {"message": "Error starting node. Please try again later."}
                 ), 500
         else:
-            node = nodes.find_one({"$or": [{"alive": False}, {"pending": True}]})
+            node = nodes.find_one({"alive": False, "pending": True})
             if node:
                 job_status = "STARTING_NODE"
             
