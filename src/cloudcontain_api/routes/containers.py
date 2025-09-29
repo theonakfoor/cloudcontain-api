@@ -68,6 +68,7 @@ def list_containers():
             {
                 "containerId": str(container["_id"]),
                 "name": container["name"],
+                "description": container["description"],
                 "created": str(container["created"]),
                 "lastModified": str(container["lastModified"]),
                 "public": container["public"],
@@ -102,6 +103,7 @@ def get_container(container_id):
             {
                 "containerId": str(container["_id"]),
                 "name": container["name"],
+                "description": container["description"],
                 "size": int(container["size"]),
                 "created": container["created"],
                 "lastModified": str(container["lastModified"]),
