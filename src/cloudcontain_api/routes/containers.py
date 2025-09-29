@@ -135,16 +135,16 @@ def update_container(container_id):
     if container:
         updates = {}
 
-        if "entryPoint" in data:
+        if "entryPoint" in data and data["entryPoint"]:
             updates["entryPoint"] = ObjectId(data["entryPoint"])
 
-        if "name" in data:
+        if "name" in data and data["name"]:
             updates["name"] = data["name"].strip()
 
-        if "description" in data:
+        if "description" in data and data["description"]:
             updates["description"] = data["description"].strip()
         
-        if "public" in data:
+        if "public" in data and data["public"]:
             try:
                 updates["public"] = bool(data["public"])
             except ValueError:
