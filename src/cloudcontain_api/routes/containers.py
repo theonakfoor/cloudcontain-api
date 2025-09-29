@@ -144,7 +144,7 @@ def update_container(container_id):
         if "description" in data and data["description"]:
             updates["description"] = data["description"].strip()
         
-        if "public" in data and data["public"]:
+        if "public" in data and data["public"] is not None:
             try:
                 updates["public"] = bool(data["public"])
             except ValueError:
