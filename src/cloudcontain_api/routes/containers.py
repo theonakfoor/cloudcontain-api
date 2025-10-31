@@ -102,6 +102,7 @@ def get_container(container_id):
         return jsonify(
             {
                 "containerId": str(container["_id"]),
+                "owner": container["owner"],
                 "name": container["name"],
                 "description": container["description"],
                 "size": int(container["size"]),
