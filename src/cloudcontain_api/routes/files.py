@@ -110,9 +110,13 @@ def get_file(container_id, file_id):
     containers = app.db["containers"]
     files = app.db["files"]
 
-    container = containers.find_one(
-        {"_id": ObjectId(container_id), "owner": request.user["sub"]}
-    )
+    container = containers.find_one({
+        "_id": ObjectId(container_id), 
+        "$or": [
+            {"owner": request.user["sub"]},
+            {"public": True}
+        ]
+    })
 
     if container:
         file = files.find_one(
@@ -151,9 +155,13 @@ def get_file_content(container_id, file_id):
     containers = app.db["containers"]
     files = app.db["files"]
 
-    container = containers.find_one(
-        {"_id": ObjectId(container_id), "owner": request.user["sub"]}
-    )
+    container = containers.find_one({
+        "_id": ObjectId(container_id), 
+        "$or": [
+            {"owner": request.user["sub"]},
+            {"public": True}
+        ]
+    })
 
     if container:
         file = files.find_one(
@@ -403,9 +411,13 @@ def search_files(container_id):
     containers = app.db["containers"]
     files = app.db["files"]
 
-    container = containers.find_one(
-        {"_id": ObjectId(container_id), "owner": request.user["sub"]}
-    )
+    container = containers.find_one({
+        "_id": ObjectId(container_id), 
+        "$or": [
+            {"owner": request.user["sub"]},
+            {"public": True}
+        ]
+    })
 
     if container:
 

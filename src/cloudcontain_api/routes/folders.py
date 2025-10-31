@@ -103,9 +103,13 @@ def get_folder(container_id, folder_id):
     folders = app.db["folders"]
     files = app.db["files"]
 
-    container = containers.find_one(
-        {"_id": ObjectId(container_id), "owner": request.user["sub"]}
-    )
+    container = containers.find_one({
+        "_id": ObjectId(container_id), 
+        "$or": [
+            {"owner": request.user["sub"]},
+            {"public": True}
+        ]
+    })
 
     if container:
         folder_path = get_path(folder_id, container)

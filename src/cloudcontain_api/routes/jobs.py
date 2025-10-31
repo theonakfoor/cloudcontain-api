@@ -15,9 +15,13 @@ def get_job_logs(container_id, job_id):
     jobs = app.db["jobs"]
     logs = app.db["logs"]
 
-    container = containers.find_one(
-        {"_id": ObjectId(container_id), "owner": request.user["sub"]}
-    )
+    container = containers.find_one({
+        "_id": ObjectId(container_id), 
+        "$or": [
+            {"owner": request.user["sub"]},
+            {"public": True}
+        ]
+    })
 
     if container:
         job = jobs.find_one(
@@ -68,9 +72,13 @@ def list_jobs(container_id):
     jobs = app.db["jobs"]
     logs = app.db["logs"]
 
-    container = containers.find_one(
-        {"_id": ObjectId(container_id), "owner": request.user["sub"]}
-    )
+    container = containers.find_one({
+        "_id": ObjectId(container_id), 
+        "$or": [
+            {"owner": request.user["sub"]},
+            {"public": True}
+        ]
+    })
 
     if container:
         query_result = jobs.find(

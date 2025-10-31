@@ -85,9 +85,13 @@ def list_containers():
 def get_container(container_id):
     col = app.db["containers"]
 
-    container = col.find_one(
-        {"_id": ObjectId(container_id), "owner": request.user["sub"]}
-    )
+    container = col.find_one({
+        "_id": ObjectId(container_id), 
+        "$or": [
+            {"owner": request.user["sub"]},
+            {"public": True}
+        ]
+    })
 
     if container:
         """
@@ -222,9 +226,13 @@ def execute_container(container_id):
     jobs = app.db["jobs"]
     nodes = app.db["nodes"]
 
-    container = containers.find_one(
-        {"_id": ObjectId(container_id), "owner": request.user["sub"]}
-    )
+    container = containers.find_one({
+        "_id": ObjectId(container_id), 
+        "$or": [
+            {"owner": request.user["sub"]},
+            {"public": True}
+        ]
+    })
 
     if container:
         active_jobs = jobs.count_documents({
