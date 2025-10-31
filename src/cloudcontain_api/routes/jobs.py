@@ -114,9 +114,9 @@ def list_jobs(container_id):
 @jobs_bp.route("/jobs", methods=["GET"])
 @require_auth
 def list_recent_jobs():
-    jobs = app.db["jobs"]
+    col = app.db["jobs"]
 
-    results = jobs.aggregate([
+    results = col.aggregate([
         {
             "$match": {
                 "requestedBy": request.user["sub"]

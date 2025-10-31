@@ -80,6 +80,60 @@ def list_containers():
     ), 200
 
 
+@containers_bp.route("/containers/recent", methods=["GET"])
+@require_auth
+def list_recent_containers():
+    col = app.db["access_logs"]
+
+    results = col.aggregate([
+        {
+            "$match": {
+                "userId": request.user["sub"]
+            }
+        },
+        {
+            "$lookup": {
+                "from": "containers",
+                "localField": "containerId",
+                "foreignField": "_id",
+                "as": "container"
+            }
+        },
+        {
+            "$unwind": "$container"
+        },
+        {
+            "$sort": {
+                "lastAccessed": -1
+            }
+        },
+        {
+            "$limit": 10
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "userId": 1,
+                "containerId": 1,
+                "lastAccessed": 1,
+                "containerName": "$container.name"
+            }
+        }
+    ])
+
+    formatted_results = [
+        {
+            "id": str(result["_id"]),
+            "userId": str(result["userId"]),
+            "containerId": str(result["containerId"]),
+            "lastAccessed": str(result["lastAccessed"]),
+            "containerName": result["containerName"]
+        } 
+        for result in results
+    ]
+
+    return jsonify(formatted_results), 200
+
 @containers_bp.route("/containers/<container_id>", methods=["GET"])
 @require_auth
 def get_container(container_id):
