@@ -83,9 +83,10 @@ def list_containers():
 @containers_bp.route("/containers/<container_id>", methods=["GET"])
 @require_auth
 def get_container(container_id):
-    col = app.db["containers"]
+    containers = app.db["containers"]
+    access_logs = app.db["access_logs"]
 
-    container = col.find_one({
+    container = containers.find_one({
         "_id": ObjectId(container_id), 
         "$or": [
             {"owner": request.user["sub"]},
@@ -94,15 +95,14 @@ def get_container(container_id):
     })
 
     if container:
-        """
-        TODO: Create new collection called access_logs to log access to containers
-        by users. Saving old snippet as reference.
 
         timestamp = datetime.now(timezone.utc)
-        col.update_one(
-            {"_id": ObjectId(container_id)}, {"$set": {"lastAccessed": timestamp}}
+        access_logs.update_one(
+            { "containerId": ObjectId(container_id), "userId": request.user["sub"] },
+            { "$set": { "lastAccessed": timestamp } },
+            { "upsert": True }
         )
-        """
+
         return jsonify(
             {
                 "containerId": str(container["_id"]),
@@ -117,7 +117,7 @@ def get_container(container_id):
             }
         ), 200
     
-    elif col.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
+    elif containers.count_documents({"_id": ObjectId(container_id)}, limit=1) != 0:
         return jsonify({
             "message": "User is not authorized to access this container."
         }), 401
