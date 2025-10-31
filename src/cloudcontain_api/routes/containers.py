@@ -100,7 +100,7 @@ def get_container(container_id):
         access_logs.update_one(
             { "containerId": ObjectId(container_id), "userId": request.user["sub"] },
             { "$set": { "lastAccessed": timestamp } },
-            { "upsert": True }
+            upsert=True
         )
 
         return jsonify(
