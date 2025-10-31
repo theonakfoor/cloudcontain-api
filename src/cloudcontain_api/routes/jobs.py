@@ -64,6 +64,7 @@ def get_job_logs(container_id, job_id):
     else:
         return jsonify({"message": "Container not found."}), 404
 
+
 @jobs_bp.route("/containers/<container_id>/jobs", methods=["GET"])
 @require_auth
 def list_jobs(container_id):
@@ -108,3 +109,67 @@ def list_jobs(container_id):
         }), 401
     else:
         return jsonify({"message": "Container not found."}), 404
+    
+
+@jobs_bp.route("/jobs", methods=["GET"])
+@require_auth
+def list_recent_jobs():
+    jobs = app.db["jobs"]
+
+    results = jobs.aggregate([
+        {
+            "$match": {
+                "requestedBy": request.user["sub"]
+            }
+        },
+        {
+            "$lookup": {
+                "from": "containers",
+                "localField": "containerId",
+                "foreignField": "_id",
+                "as": "container"
+            }
+        },
+        {
+            "$unwind": "$container"
+        },
+        {
+            "$sort": {
+                "queued": -1
+            }
+        },
+        {
+            "$limit": 10
+        },
+        {
+            "$project": {
+                "_id": 1,
+                "status": 1,
+                "queued": 1,
+                "started": 1,
+                "ended": 1,
+                "requestedBy": 1,
+                "node": 1,
+                "nodeId": 1,
+                "containerId": 1,
+                "containerName": "$container.name"
+            }
+        }
+    ])
+
+    formatted_results = [
+        {
+            "jobId": str(job["_id"]),
+            "status": job["status"],
+            "queued": str(job["queued"]) if job["queued"] else None,
+            "started": str(job["started"]) if job["started"] else None,
+            "ended": str(job["ended"]) if job["ended"] else None,
+            "requestedBy": job["requestedBy"],
+            "node": str(job["node"]) if job["node"] else None,
+            "containerId": str(job["containerId"]),
+            "containerName": job["containerName"]
+        }
+        for job in results
+    ]
+
+    return jsonify(formatted_results), 200
