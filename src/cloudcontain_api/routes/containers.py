@@ -112,7 +112,7 @@ def list_recent_containers():
         },
         {
             "$project": {
-                "_id": 0,
+                "_id": 1,
                 "userId": 1,
                 "containerId": 1,
                 "lastAccessed": 1,
@@ -123,13 +123,13 @@ def list_recent_containers():
 
     formatted_results = [
         {
-            "id": str(result["_id"]),
-            "userId": str(result["userId"]),
-            "containerId": str(result["containerId"]),
-            "lastAccessed": str(result["lastAccessed"]),
-            "containerName": result["containerName"]
+            "id": str(container["_id"]),
+            "userId": str(container["userId"]),
+            "containerId": str(container["containerId"]),
+            "lastAccessed": str(container["lastAccessed"]),
+            "containerName": container["containerName"]
         } 
-        for result in results
+        for container in results
     ]
 
     return jsonify(formatted_results), 200
