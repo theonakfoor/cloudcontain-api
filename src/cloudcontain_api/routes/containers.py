@@ -240,6 +240,7 @@ def delete_container(container_id):
     files = app.db["files"]
     jobs = app.db["jobs"]
     logs = app.db["logs"]
+    access_logs = app.db["access_logs"]
 
     container = containers.find_one(
         {"_id": ObjectId(container_id), "owner": request.user["sub"]}
@@ -260,6 +261,7 @@ def delete_container(container_id):
         folders.delete_many({"containerId": ObjectId(container_id)})
         jobs.delete_many({"containerId": ObjectId(container_id)})
         logs.delete_many({"containerId": ObjectId(container_id)})
+        access_logs.delete_many({"containerId": ObjectId(container_id)})
 
         containers.delete_one({"_id": ObjectId(container_id)})
         
