@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta, timezone
+import re
 
 from bson import ObjectId
 from flask import Blueprint, jsonify, request
@@ -427,3 +428,53 @@ def execute_container(container_id):
         }), 401
     else:
         return jsonify({"message": "Container not found."}), 404
+    
+
+@containers_bp.route("/containers/search", methods=["POST"])
+@require_auth
+def search_containers():
+    data = request.get_json()
+    offset = int(request.args.get("offset", 0))
+    containers = app.db["containers"]
+
+    if "query" not in data or not data["query"].strip():
+        return jsonify({"message": "Please provide a valid search query."}), 400
+        
+    query = re.compile(re.escape(data["query"]), re.IGNORECASE)
+    query_result = containers.aggregate([
+        {
+            "$match": {
+                "owner": request.user["sub"],
+                "name": query,
+            }
+        },
+        { "$limit": offset + 10, },
+        { "$skip": offset },
+        { "$sort": {"name": 1}},
+    ])
+    result_count = containers.count_documents(
+        {
+            "owner": request.user["sub"],
+            "name": query,
+        }
+    )    
+
+    results = [
+        {
+            "containerId": str(container["_id"]),
+            "name": container["name"],
+            "description": container["description"],
+            "created": str(container["created"]),
+            "lastModified": str(container["lastModified"]),
+            "public": container["public"],
+            "size": container["size"],
+        }
+        for container in query_result
+    ]
+
+    return jsonify({
+        "containers": results,
+        "total": result_count,
+        "hasMore": result_count > offset + 10
+    }), 200
+    
